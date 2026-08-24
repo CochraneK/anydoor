@@ -284,8 +284,13 @@ async function checkHealth() {
     $("health-detail").textContent = payload?.service ? `${payload.service} · ${payload.day || "在线"}` : "网关在线";
     setConnection("online", "已连接");
   } catch (error) {
-    $("endpoint-status").textContent = "不可用"; $("endpoint-status").style.color = "#a44848";
-    $("health-detail").textContent = error.message || "无法连接网关"; setConnection("error", "连接失败");
+    if (error.status === 401 || error.status === 403) {
+      $("endpoint-status").textContent = "正常"; $("endpoint-status").style.color = "#267d5d";
+      $("health-detail").textContent = "网关在线 · 请先注册或登录"; setConnection("online", "已连接");
+    } else {
+      $("endpoint-status").textContent = "不可用"; $("endpoint-status").style.color = "#a44848";
+      $("health-detail").textContent = error.message || "无法连接网关"; setConnection("error", "连接失败");
+    }
   }
 }
 async function sendTest() {

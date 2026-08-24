@@ -132,10 +132,8 @@ function createCloudAuthStore(AuthError, { minPasswordLength = 8 } = {}) {
 
   async function findByToken(token) {
     // Runs the same steps as traceTokenLookup; returns the user or null.
-    console.error('[anydoor-debug] findByToken type=' + typeof token + ' len=' + (typeof token === 'string' ? token.length : -1) + ' prefix=' + (typeof token === 'string' ? JSON.stringify(token.slice(0, 4)) : ''));
     try {
       const trace = await this.traceTokenLookup(token);
-      console.error('[anydoor-debug] findByToken trace result=' + trace.result + ' steps=' + JSON.stringify(trace.steps));
       if (trace.result !== 'ok') return null;
       const tokenDocId = sha256Hex(token);
       const db = getDb();
@@ -143,10 +141,8 @@ function createCloudAuthStore(AuthError, { minPasswordLength = 8 } = {}) {
       const tokenDoc = (res.data && res.data[0]) || null;
       if (!tokenDoc || !tokenDoc.userId) return null;
       const user = await fetchUserDoc(tokenDoc.userId);
-      console.error('[anydoor-debug] findByToken user=' + (user ? user.id : 'null'));
       return user;
     } catch (error) {
-      console.error('[anydoor-debug] findByToken threw: ' + String((error && error.message) || error) + ' stack=' + (error && error.stack ? error.stack.split('\n')[0] : ''));
       return null;
     }
   }
