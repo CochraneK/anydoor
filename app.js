@@ -10,7 +10,7 @@ const state = {
   user: null,
   remember: false,
   tokenRevealed: false,
-  snippet: "codex",
+  snippet: "curl",
   models: [],
   apiBase: "",
 };
@@ -183,7 +183,15 @@ function snippetValues() {
 }
 function renderSnippets() {
   const { base, model, provider, providerHeader, promptJson, bodyJson, token } = snippetValues();
-  const v1 = `${base}/v1`;
+  const snippets = {
+    curl: [`curl ${base}/v1/chat/completions \\`, `  -H 'Authorization: Bearer ${token}' \\`, `  -H 'Content-Type: application/json'${providerHeader} \\`, `  -d ${shellQuote(bodyJson)}`].join("\n"),
+    javascript: `const response = await fetch("${base}/v1/chat/completions", {\n  method: "POST",\n  headers: {\n    "Authorization": "Bearer ${token}",\n    "Content-Type": "application/json"${provider ? `,\n    "x-provider": "${provider}"` : ""}\n  },\n  body: JSON.stringify({\n    model: "${model}",\n    messages: [{ role: "user", content: ${promptJson} }]\n  })\n});\nconst data = await response.json();`,
+    python: `import requests\n\nresponse = requests.post(\n    "${base}/v1/chat/completions",\n    headers={"Authorization": "Bearer ${token}"${provider ? `, "x-provider": "${provider}"` : ""}},\n    json={"model": "${model}", "messages": [{"role": "user", "content": ${promptJson}}]},\n)\nprint(response.json())`,
+  };
+  $("snippet-code").textContent = snippets[state.snippet] || snippets.curl;
+  $("snippet-code").dataset.raw = snippets[state.snippet] || snippets.curl;
+}
+function configuredModelList(fallback) {
   const seenModels = new Set();
   const modelIds = [];
   for (const m of state.models) {
@@ -191,17 +199,15 @@ function renderSnippets() {
     seenModels.add(m.id);
     modelIds.push(m.id);
   }
-  const modelList = modelIds.slice(0, 12).join(", ") || model;
-  const codexToml = [`model = "${model}"`, 'model_provider = "anydoor"', "", "[model_providers.anydoor]", 'name = "AnyDoor"', `base_url = "${v1}"`, 'wire_api = "chat"', 'env_key = "ANYDOOR_API_KEY"'].join("\n");
-  const snippets = {
-    codex: `请帮我把 AnyDoor API 中转站配置到 Codex CLI：\n\n1. 打开（或创建）Codex 配置文件 ~/.codex/config.toml（Windows 上是 %USERPROFILE%/.codex/config.toml），把下面的配置合并进去，不要改动已有的其它配置：\n\n${codexToml}\n\n2. 把 API Key 写入环境变量 ANYDOOR_API_KEY（用户级、永久生效），Key 的值是：${token}\n   - Windows PowerShell 可执行：[Environment]::SetEnvironmentVariable("ANYDOOR_API_KEY", "${token}", "User")\n   - macOS / Linux：在 shell 配置文件里追加 export ANYDOOR_API_KEY="${token}"\n\n3. 重启终端，运行 codex 并发一句话，确认能正常回复。\n\n说明：该网关兼容 OpenAI chat/completions 协议，可用模型：${modelList}。想换模型直接修改 model 字段。`,
-    workbuddy: `请帮我把 AnyDoor 接入 WorkBuddy，作为自定义模型（OpenAI 兼容 API 中转站）：\n\n- 接口地址 / Base URL：${v1}\n- API Key：${token}\n- 模型名：${model}\n\n请在 WorkBuddy 的设置里找到「自定义模型 / OpenAI 兼容 Provider / 模型服务」之类的入口，把上面的信息填进去；如果它的地址栏要求不带 /v1 的根地址，就填 ${base}。配置好后请发一句简单对话测试连通性。\n\n说明：可用模型：${modelList}，可按需添加多个模型条目。`,
-    curl: [`curl ${base}/v1/chat/completions \\`, `  -H 'Authorization: Bearer ${token}' \\`, `  -H 'Content-Type: application/json'${providerHeader} \\`, `  -d ${shellQuote(bodyJson)}`].join("\n"),
-    javascript: `const response = await fetch("${base}/v1/chat/completions", {\n  method: "POST",\n  headers: {\n    "Authorization": "Bearer ${token}",\n    "Content-Type": "application/json"${provider ? `,\n    "x-provider": "${provider}"` : ""}\n  },\n  body: JSON.stringify({\n    model: "${model}",\n    messages: [{ role: "user", content: ${promptJson} }]\n  })\n});\nconst data = await response.json();`,
-    python: `import requests\n\nresponse = requests.post(\n    "${base}/v1/chat/completions",\n    headers={"Authorization": "Bearer ${token}"${provider ? `, "x-provider": "${provider}"` : ""}},\n    json={"model": "${model}", "messages": [{"role": "user", "content": ${promptJson}}]},\n)\nprint(response.json())`,
-  };
-  $("snippet-code").textContent = snippets[state.snippet] || snippets.codex;
-  $("snippet-code").dataset.raw = snippets[state.snippet] || snippets.codex;
+  return modelIds.slice(0, 12).join(", ") || fallback;
+}
+function renderAiSetup() {
+  const { base, model, token } = snippetValues();
+  const node = $("ai-setup-code");
+  if (!node) return;
+  const prompt = `请帮我把 AnyDoor 接入 WorkBuddy，作为自定义模型（OpenAI 兼容 API 中转站）：\n\n- 接口地址 / Base URL：${base}/v1\n- API Key：${token}\n- 模型名：${model}\n\n请在 WorkBuddy 的设置里找到「自定义模型 / OpenAI 兼容 Provider / 模型服务」之类的入口，把上面的信息填进去；如果它的地址栏要求不带 /v1 的根地址，就填 ${base}。配置好后请发一句简单对话测试连通性。\n\n说明：可用模型：${configuredModelList(model)}，可按需添加多个模型条目。`;
+  node.textContent = prompt;
+  node.dataset.raw = prompt;
 }
 function renderModels(payload) {
   const models = Array.isArray(payload?.data) ? payload.data : [];
@@ -233,6 +239,7 @@ function renderModels(payload) {
   providerSelect.innerHTML = `<option value="">自动选择</option>${providers.map((item) => `<option value="${escapeAttr(item.provider)}">${escapeHtml(item.label)} · ${escapeHtml(item.model)}</option>`).join("")}`;
   if (providers.some((item) => item.provider === current)) providerSelect.value = current;
   renderSnippets();
+  renderAiSetup();
 }
 function escapeHtml(value) { return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char])); }
 function escapeAttr(value) { return escapeHtml(value); }
@@ -333,14 +340,15 @@ $("reveal-token-btn").addEventListener("click", () => { state.tokenRevealed = !s
 $("copy-token-btn").addEventListener("click", () => copyText(state.token, "token-message", "令牌已复制"));
 $("copy-new-token-btn").addEventListener("click", () => copyText($("new-token-value").textContent, "new-token-message", "令牌已复制"));
 $("dismiss-token-btn").addEventListener("click", () => { $("new-token-banner").hidden = true; });
-$("api-base-input").addEventListener("change", () => { const normalized = normalizeBase($("api-base-input").value); state.apiBase = normalized; $("api-base-input").value = normalized; storageSet(localStorage, API_KEY, normalized); renderSnippets(); checkHealth(); });
+$("api-base-input").addEventListener("change", () => { const normalized = normalizeBase($("api-base-input").value); state.apiBase = normalized; $("api-base-input").value = normalized; storageSet(localStorage, API_KEY, normalized); renderSnippets(); renderAiSetup(); checkHealth(); });
 $("check-health-btn").addEventListener("click", checkHealth);
 $("refresh-all-btn").addEventListener("click", async () => { await Promise.all([checkHealth(), loadModels()]); showToast("状态已刷新"); });
 $("refresh-models-btn").addEventListener("click", loadModels);
-$("provider-input").addEventListener("change", renderSnippets);
+$("provider-input").addEventListener("change", () => { renderSnippets(); renderAiSetup(); });
 $("prompt-input").addEventListener("input", renderSnippets);
 document.querySelectorAll(".snippet-tab").forEach((tab) => tab.addEventListener("click", () => { state.snippet = tab.dataset.snippet; document.querySelectorAll(".snippet-tab").forEach((item) => { const active = item === tab; item.classList.toggle("active", active); item.setAttribute("aria-selected", String(active)); }); renderSnippets(); }));
 $("copy-snippet-btn").addEventListener("click", () => copyText($("snippet-code").dataset.raw || $("snippet-code").textContent, null, "调用示例已复制"));
+$("copy-ai-btn").addEventListener("click", () => copyText($("ai-setup-code").dataset.raw || $("ai-setup-code").textContent, null, "配置提示词已复制"));
 $("send-test-btn").addEventListener("click", sendTest);
 $("copy-result-btn").addEventListener("click", () => copyText($("test-result").textContent, null, "响应已复制"));
 
@@ -348,4 +356,5 @@ state.apiBase = normalizeBase(storageGet(localStorage, API_KEY)) || defaultApiBa
 $("api-base-input").value = state.apiBase || window.location.origin;
 $("remember-input").checked = storageGet(localStorage, REMEMBER_KEY) === "1";
 renderSnippets();
+renderAiSetup();
 restoreSession();
