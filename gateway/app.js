@@ -10,7 +10,7 @@ const state = {
   user: null,
   remember: false,
   tokenRevealed: false,
-  snippet: "curl",
+  snippet: "codex",
   models: [],
   apiBase: "",
 };
@@ -183,13 +183,25 @@ function snippetValues() {
 }
 function renderSnippets() {
   const { base, model, provider, providerHeader, promptJson, bodyJson, token } = snippetValues();
+  const v1 = `${base}/v1`;
+  const seenModels = new Set();
+  const modelIds = [];
+  for (const m of state.models) {
+    if (!m || !m.id || m.enabled === false || m.configured === false || seenModels.has(m.id)) continue;
+    seenModels.add(m.id);
+    modelIds.push(m.id);
+  }
+  const modelList = modelIds.slice(0, 12).join(", ") || model;
+  const codexToml = [`model = "${model}"`, 'model_provider = "anydoor"', "", "[model_providers.anydoor]", 'name = "AnyDoor"', `base_url = "${v1}"`, 'wire_api = "chat"', 'env_key = "ANYDOOR_API_KEY"'].join("\n");
   const snippets = {
+    codex: `请帮我把 AnyDoor API 中转站配置到 Codex CLI：\n\n1. 打开（或创建）Codex 配置文件 ~/.codex/config.toml（Windows 上是 %USERPROFILE%/.codex/config.toml），把下面的配置合并进去，不要改动已有的其它配置：\n\n${codexToml}\n\n2. 把 API Key 写入环境变量 ANYDOOR_API_KEY（用户级、永久生效），Key 的值是：${token}\n   - Windows PowerShell 可执行：[Environment]::SetEnvironmentVariable("ANYDOOR_API_KEY", "${token}", "User")\n   - macOS / Linux：在 shell 配置文件里追加 export ANYDOOR_API_KEY="${token}"\n\n3. 重启终端，运行 codex 并发一句话，确认能正常回复。\n\n说明：该网关兼容 OpenAI chat/completions 协议，可用模型：${modelList}。想换模型直接修改 model 字段。`,
+    workbuddy: `请帮我把 AnyDoor 接入 WorkBuddy，作为自定义模型（OpenAI 兼容 API 中转站）：\n\n- 接口地址 / Base URL：${v1}\n- API Key：${token}\n- 模型名：${model}\n\n请在 WorkBuddy 的设置里找到「自定义模型 / OpenAI 兼容 Provider / 模型服务」之类的入口，把上面的信息填进去；如果它的地址栏要求不带 /v1 的根地址，就填 ${base}。配置好后请发一句简单对话测试连通性。\n\n说明：可用模型：${modelList}，可按需添加多个模型条目。`,
     curl: [`curl ${base}/v1/chat/completions \\`, `  -H 'Authorization: Bearer ${token}' \\`, `  -H 'Content-Type: application/json'${providerHeader} \\`, `  -d ${shellQuote(bodyJson)}`].join("\n"),
     javascript: `const response = await fetch("${base}/v1/chat/completions", {\n  method: "POST",\n  headers: {\n    "Authorization": "Bearer ${token}",\n    "Content-Type": "application/json"${provider ? `,\n    "x-provider": "${provider}"` : ""}\n  },\n  body: JSON.stringify({\n    model: "${model}",\n    messages: [{ role: "user", content: ${promptJson} }]\n  })\n});\nconst data = await response.json();`,
     python: `import requests\n\nresponse = requests.post(\n    "${base}/v1/chat/completions",\n    headers={"Authorization": "Bearer ${token}"${provider ? `, "x-provider": "${provider}"` : ""}},\n    json={"model": "${model}", "messages": [{"role": "user", "content": ${promptJson}}]},\n)\nprint(response.json())`,
   };
-  $("snippet-code").textContent = snippets[state.snippet] || snippets.curl;
-  $("snippet-code").dataset.raw = snippets[state.snippet] || snippets.curl;
+  $("snippet-code").textContent = snippets[state.snippet] || snippets.codex;
+  $("snippet-code").dataset.raw = snippets[state.snippet] || snippets.codex;
 }
 function renderModels(payload) {
   const models = Array.isArray(payload?.data) ? payload.data : [];
