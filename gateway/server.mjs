@@ -45,6 +45,13 @@ function publicUser(user) {
   return result;
 }
 
+function adminUser(user) {
+  return {
+    ...publicUser(user),
+    token_created_at: user.tokenCreatedAt,
+  };
+}
+
 function tokenHash(token) {
   return crypto.createHash('sha256').update(token).digest('hex');
 }
@@ -254,6 +261,37 @@ export class AuthStore {
     return this.usersByEmail.get(normalizeEmail(emailValue)) || null;
   }
 
+  listUsers() {
+    return [...this.usersById.values()]
+      .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
+      .map(adminUser);
+  }
+
+  resetPassword(emailValue, password) {
+    const user = this.findByEmail(emailValue);
+    if (!user) throw new AuthError('account not found', 'account_not_found', 404);
+    if (!validPassword(password, this.minPasswordLength)) {
+      throw new AuthError(`password must be ${this.minPasswordLength}-128 characters`, 'invalid_password', 400);
+    }
+    const oldPasswordSalt = user.passwordSalt;
+    const oldPasswordHash = user.passwordHash;
+    const oldTokenHash = user.tokenHash;
+    const oldTokenCreatedAt = user.tokenCreatedAt;
+    const passwordData = hashPassword(password);
+    user.passwordSalt = passwordData.salt;
+    user.passwordHash = passwordData.hash;
+    const issued = this.issueToken(user);
+    try {
+      this.persist();
+    } catch {
+      this.restoreToken(user, oldTokenHash, oldTokenCreatedAt, issued.oldHash === oldTokenHash ? user.tokenHash : issued.oldHash);
+      user.passwordSalt = oldPasswordSalt;
+      user.passwordHash = oldPasswordHash;
+      throw new AuthError('account storage is unavailable', 'auth_store_error', 503);
+    }
+    return issued;
+  }
+
   findByToken(token) {
     if (typeof token !== 'string' || token.length < 16 || token.length > 256) return null;
     return this.usersByToken.get(tokenHash(token)) || null;
@@ -394,6 +432,8 @@ function providerFromFile(name, fileConfig = {}) {
     configUrl: '',
     docsUrl: '',
     status: '',
+    tier: 99,
+    quotaNote: '',
   };
   const fromFile = fileConfig || {};
   const value = (key, fallback) => fromFile[key] !== undefined && fromFile[key] !== '' ? fromFile[key] : fallback;
@@ -412,6 +452,8 @@ function providerFromFile(name, fileConfig = {}) {
     configUrl: value('config_url', defaults.configUrl),
     docsUrl: value('docs_url', defaults.docsUrl),
     status: value('status', defaults.status),
+    tier: Math.floor(Number(value('tier', defaults.tier))) || defaults.tier,
+    quotaNote: value('quota_note', defaults.quotaNote),
   };
   const apiKey = envValue(providerEnvNames(name, 'API_KEY'));
   const baseUrl = envValue(providerEnvNames(name, 'BASE_URL'));
@@ -485,6 +527,7 @@ function normalizeConfig(config) {
       ['api_key', 'apiKey'], ['base_url', 'baseUrl'], ['min_output_tokens', 'minOutputTokens'],
       ['input_usd_per_million', 'inputUsdPerMillion'], ['output_usd_per_million', 'outputUsdPerMillion'],
       ['config_url', 'configUrl'], ['docs_url', 'docsUrl'], ['auth_mode', 'auth'],
+      ['quota_note', 'quotaNote'],
     ]) {
       if (supplied[camel] === undefined && supplied[snake] !== undefined) supplied[camel] = supplied[snake];
     }
@@ -493,6 +536,7 @@ function normalizeConfig(config) {
     provider.apiKey = String(provider.apiKey || '').trim();
     provider.auth = String(provider.auth || 'bearer').trim().toLowerCase();
     provider.models = listValue(provider.models);
+    provider.tier = Number.isFinite(Number(provider.tier)) ? Math.floor(Number(provider.tier)) : 99;
     provider.enabled = boolValue(provider.enabled, true);
     provider.minOutputTokens = Math.max(1, Math.floor(Number(provider.minOutputTokens) || 1));
     provider.inputUsdPerMillion = Number(provider.inputUsdPerMillion) || 0;
@@ -674,6 +718,7 @@ function createState() {
     estimatedUsd: 0,
     rateWindows: new Map(),
     authStore: null,
+    quotaCache: { at: 0, entries: {}, inflight: false },
   };
 }
 
@@ -765,6 +810,53 @@ function redactUpstreamMessage(message, providerConfig) {
   // Upstream error bodies occasionally echo credentials from a failed
   // request. Redact common key-shaped strings before they reach the caller.
   return text.replace(/\b(?:sk|key|token)[-_][A-Za-z0-9._-]{16,}\b/gi, '[redacted]');
+}
+
+const QUOTA_TTL_MS = 15 * 60 * 1000;
+
+async function probeProviderQuota(providerConfig) {
+  const checkedAt = new Date().toISOString();
+  const baseUrl = String(providerConfig.baseUrl || '');
+  const status = String(providerConfig.status || '');
+  if (providerConfig.enabled === false) return { kind: 'disabled', checked_at: checkedAt };
+  // OpenRouter exposes per-key credit usage.
+  if (baseUrl.includes('openrouter.ai') && providerConfig.apiKey) {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 8000);
+      try {
+        const response = await fetch(`${baseUrl.replace(/\/+$/, '')}/auth/key`, { headers: { authorization: String.fromCharCode(66, 101, 97, 114, 101, 114) + ' ' + providerConfig.apiKey }, signal: ctrl.signal });
+        if (response.ok) {
+          const data = (await response.json()).data || {};
+          const used = Number(data.total_usage) || 0;
+          const limit = typeof data.limit === 'number' ? data.limit : null;
+          if (limit === null) return { kind: data.is_free_tier ? 'free' : 'usage', used: Number(used.toFixed(4)), checked_at: checkedAt };
+          return { kind: 'usd', used: Number(used.toFixed(4)), limit, remaining: Number(Math.max(0, limit - used).toFixed(4)), checked_at: checkedAt };
+        }
+      } finally {
+        clearTimeout(timer);
+      }
+    } catch { /* fall through to unknown */ }
+  }
+  if (/quota_exhausted/.test(status)) return { kind: 'exhausted', checked_at: checkedAt };
+  if (providerConfig.quotaNote) return { kind: 'note', note: providerConfig.quotaNote, checked_at: checkedAt };
+  return { kind: 'unknown', checked_at: checkedAt };
+}
+
+async function refreshQuota(config, state) {
+  const cache = state.quotaCache;
+  if (!cache || cache.inflight) return;
+  cache.inflight = true;
+  try {
+    const entries = {};
+    await Promise.all(Object.entries(config.providers).map(async ([name, provider]) => {
+      entries[name] = await probeProviderQuota(provider);
+    }));
+    cache.entries = entries;
+    cache.at = Date.now();
+  } finally {
+    cache.inflight = false;
+  }
 }
 
 async function callProvider(payload, providerConfig, config, providerName) {
@@ -906,6 +998,39 @@ export function createServer({ config = loadConfig(), state = createState(), aut
       return;
     }
 
+    if (url.pathname === '/auth/admin/users' || url.pathname === '/auth/admin/reset-password') {
+      if (!authStore || !identity || identity.kind !== 'gateway') {
+        sendJson(res, 403, safeError('administrator credentials required', 'admin_required', id), cors);
+        return;
+      }
+      if (req.method === 'GET' && url.pathname === '/auth/admin/users') {
+        sendJson(res, 200, { users: authStore.listUsers() }, cors);
+        return;
+      }
+      if (req.method === 'POST' && url.pathname === '/auth/admin/reset-password') {
+        let body;
+        try { body = await readJsonBody(req, normalizedConfig.maxBodyBytes); } catch (error) {
+          const code = error.message === 'request_body_too_large' ? 'payload_too_large' : 'invalid_json';
+          sendJson(res, 400, safeError(code === 'payload_too_large' ? 'request body too large' : 'invalid JSON body', code, id), cors);
+          return;
+        }
+        if (!isObjectBody(body)) {
+          sendJson(res, 400, safeError('request body must be a JSON object', 'invalid_request', id), cors);
+          return;
+        }
+        try {
+          const issued = await authStore.resetPassword(body.email, body.password);
+          sendJson(res, 200, authPayload(issued), cors);
+        } catch (error) {
+          const status = Number(error.status) || 503;
+          sendJson(res, status, authErrorPayload(error, id), cors);
+        }
+        return;
+      }
+      sendJson(res, 405, safeError('method not allowed', 'method_not_allowed', id), cors);
+      return;
+    }
+
     if (req.method === 'GET' && url.pathname === '/auth/me') {
       if (!identity || identity.kind !== 'user') {
         sendJson(res, 401, safeError('a user token is required', 'unauthorized', id), cors);
@@ -955,7 +1080,7 @@ export function createServer({ config = loadConfig(), state = createState(), aut
     if (req.method === 'GET' && url.pathname === '/') {
       sendJson(res, 200, {
         service: 'anydoor-gateway',
-        endpoints: ['/console/', '/health', '/auth/register', '/auth/login', '/auth/me', '/auth/tokens', '/v1/models', '/v1/chat/completions'],
+        endpoints: ['/console/', '/health', '/auth/register', '/auth/login', '/auth/me', '/auth/tokens', '/auth/admin/users', '/auth/admin/reset-password', '/v1/models', '/v1/chat/completions'],
         auth: normalizedConfig.gatewayKey || normalizedConfig.auth.requireToken ? 'required' : 'disabled',
         registration: normalizedConfig.auth.enabled && normalizedConfig.auth.registrationEnabled ? 'open' : 'disabled',
         mock: normalizedConfig.mockUpstream,
@@ -963,16 +1088,25 @@ export function createServer({ config = loadConfig(), state = createState(), aut
       return;
     }
     if (req.method === 'GET' && url.pathname === '/v1/models') {
-      const models = Object.entries(normalizedConfig.providers).map(([name, p]) => ({
-        id: p.model,
-        object: 'model',
-        provider: name,
-        vendor: p.vendor,
-        configured: providerConfigured(name, p, normalizedConfig),
-        enabled: p.enabled !== false,
-        ...(p.status ? { status: p.status } : {}),
-        ...(p.models.length ? { models: p.models } : {}),
-      }));
+      const quotaCache = state.quotaCache;
+      if (Date.now() - quotaCache.at > QUOTA_TTL_MS) {
+        if (quotaCache.at === 0) await refreshQuota(normalizedConfig, state);
+        else refreshQuota(normalizedConfig, state).catch(() => {});
+      }
+      const models = Object.entries(normalizedConfig.providers)
+        .map(([name, p]) => ({
+          id: p.model,
+          object: 'model',
+          provider: name,
+          vendor: p.vendor,
+          configured: providerConfigured(name, p, normalizedConfig),
+          enabled: p.enabled !== false,
+          tier: Number.isFinite(p.tier) ? p.tier : 99,
+          ...(p.status ? { status: p.status } : {}),
+          ...(p.models.length ? { models: p.models } : {}),
+          ...(quotaCache.entries[name] ? { quota: quotaCache.entries[name] } : {}),
+        }))
+        .sort((a, b) => (a.tier - b.tier) || String(a.provider).localeCompare(String(b.provider)));
       sendJson(res, 200, { object: 'list', data: models, usage: { requests_today: state.requestCount, tokens_today: state.promptTokens + state.completionTokens, estimated_usd_today: Number(state.estimatedUsd.toFixed(6)) } }, cors);
       return;
     }

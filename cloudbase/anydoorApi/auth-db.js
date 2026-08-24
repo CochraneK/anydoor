@@ -80,6 +80,16 @@ function verifyPassword(password, user) {
   }
 }
 
+function adminUser(user) {
+  return {
+    id: user.id,
+    email: user.email,
+    created_at: user.createdAt,
+    ...(user.name ? { name: user.name } : {}),
+    token_created_at: user.tokenCreatedAt,
+  };
+}
+
 function docIdForEmail(email) {
   // Document ids avoid '@' / '.' entirely.
   return sha256Hex(email);
@@ -254,6 +264,42 @@ function createCloudAuthStore(AuthError, { minPasswordLength = 8 } = {}) {
 
     findByEmail,
     findByToken,
+
+    async listUsers() {
+      const db = getDb();
+      await ensureCollections(db);
+      const res = await db.collection(USERS).limit(1000).get();
+      return (res.data || [])
+        .map(docToUser)
+        .filter(Boolean)
+        .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
+        .map(adminUser);
+    },
+
+    async resetPassword(emailValue, password) {
+      const email = normalizeEmail(emailValue);
+      if (!validPassword(password, minLength)) {
+        throw new AuthError(`password must be ${minLength}-128 characters`, 'invalid_password', 400);
+      }
+      const user = await findByEmail(email);
+      if (!user) throw new AuthError('account not found', 'account_not_found', 404);
+      const passwordData = hashPassword(password);
+      const oldPasswordSalt = user.passwordSalt;
+      const oldPasswordHash = user.passwordHash;
+      const issued = await issueToken(user);
+      user.passwordSalt = passwordData.salt;
+      user.passwordHash = passwordData.hash;
+      try {
+        await saveUser(user);
+        await deleteTokenDoc(issued.oldHash);
+        return issued;
+      } catch (error) {
+        user.passwordSalt = oldPasswordSalt;
+        user.passwordHash = oldPasswordHash;
+        await deleteTokenDoc(user.tokenHash);
+        throw wrapDbError(error, AuthError);
+      }
+    },
 
     async login(emailValue, password) {
       const user = await findByEmail(emailValue);

@@ -17,6 +17,8 @@
 - `POST /auth/login`：登录并轮换 token，旧 token 会失效。
 - `GET /auth/me`：查看当前账号信息。
 - `POST /auth/tokens`：用户轮换自己的 token；管理员 `GATEWAY_KEY` 可带 `{ "email": "..." }` 为指定账号补发 token。
+- `GET /auth/admin/users`：管理员使用 `GATEWAY_KEY` 查看账号邮箱、名称、注册时间和 Token 更新时间；不会返回密码或 Token 哈希。
+- `POST /auth/admin/reset-password`：管理员使用 `GATEWAY_KEY` 按邮箱重置密码并生成一次性新 Token；旧密码和旧 Token 会立即失效。
 - `GET /v1/models`：列出已配置的 provider 和当日用量摘要。
 - `POST /v1/chat/completions`：通过 `x-provider` 选择上游；支持 Kimi、Qwen、FreeLLMAPI 及 `api.txt` 中配置的其他 OpenAI 兼容 provider。
 - 账号密码使用 Node `scrypt` 哈希；持久化文件只保存密码哈希和 token 哈希，不保存明文 token。
@@ -42,6 +44,14 @@ node .\gateway\test.mjs
 ```powershell
 $account = Invoke-RestMethod http://127.0.0.1:8787/auth/register -Method Post -ContentType 'application/json' -Body '{"email":"you@example.com","password":"correct horse battery staple"}'
 $account.token
+```
+
+管理员操作需要服务端配置的 `GATEWAY_KEY`，不要把它放入前端：
+
+```powershell
+$adminHeaders = @{ Authorization = "Bearer $env:GATEWAY_KEY" }
+Invoke-RestMethod http://127.0.0.1:8787/auth/admin/users -Headers $adminHeaders
+Invoke-RestMethod http://127.0.0.1:8787/auth/admin/reset-password -Method Post -Headers $adminHeaders -ContentType 'application/json' -Body '{"email":"you@example.com","password":"new secure password"}'
 ```
 
 调用模型时把返回的 token 放进请求头：

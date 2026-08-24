@@ -120,13 +120,48 @@ try {
   assert.equal(adminIssued.status, 200);
   const adminIssuedData = await adminIssued.json();
   assert.notEqual(adminIssuedData.token, rotatedData.token);
+  const adminUsers = await fetch(`${base}/auth/admin/users`, {
+    headers: { authorization: 'Bearer test-gateway-key' },
+  });
+  assert.equal(adminUsers.status, 200);
+  const adminUsersData = await adminUsers.json();
+  assert.equal(adminUsersData.users.length, 1);
+  assert.equal(adminUsersData.users[0].email, 'alice@example.com');
+  assert.equal(Object.hasOwn(adminUsersData.users[0], 'passwordHash'), false);
+  assert.equal(Object.hasOwn(adminUsersData.users[0], 'tokenHash'), false);
+
+  const userAdminAttempt = await fetch(`${base}/auth/admin/users`, {
+    headers: { authorization: `Bearer ${adminIssuedData.token}` },
+  });
+  assert.equal(userAdminAttempt.status, 403);
+
+  const reset = await fetch(`${base}/auth/admin/reset-password`, {
+    method: 'POST', headers: { authorization: 'Bearer test-gateway-key', 'content-type': 'application/json' },
+    body: JSON.stringify({ email: 'alice@example.com', password: 'new secure password' }),
+  });
+  assert.equal(reset.status, 200);
+  const resetData = await reset.json();
+  assert.notEqual(resetData.token, adminIssuedData.token);
+  const oldTokenAfterReset = await fetch(`${base}/auth/me`, { headers: { authorization: `Bearer ${adminIssuedData.token}` } });
+  assert.equal(oldTokenAfterReset.status, 401);
+  const oldPasswordLogin = await fetch(`${base}/auth/login`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ email: 'alice@example.com', password: 'correct horse battery staple' }),
+  });
+  assert.equal(oldPasswordLogin.status, 401);
+  const newPasswordLogin = await fetch(`${base}/auth/login`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ email: 'alice@example.com', password: 'new secure password' }),
+  });
+  assert.equal(newPasswordLogin.status, 200);
+  const newPasswordLoginData = await newPasswordLogin.json();
   const persisted = fs.readFileSync(authStorePath, 'utf8');
   assert.equal(persisted.includes(adminIssuedData.token), false);
   assert.equal(persisted.includes('correct horse battery staple'), false);
   assert.match(persisted, /"passwordHash"\s*:/);
   assert.match(persisted, /"tokenHash"\s*:/);
   const reloadedStore = new AuthStore({ storePath: authStorePath });
-  assert.ok(reloadedStore.findByToken(adminIssuedData.token));
+  assert.ok(reloadedStore.findByToken(newPasswordLoginData.token));
 
   const health = await fetch(`${base}/health`, { headers: { authorization: 'Bearer test-gateway-key' } }).then((r) => r.json());
   assert.equal(health.ok, true);

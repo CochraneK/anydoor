@@ -209,8 +209,29 @@ function renderAiSetup() {
   node.textContent = prompt;
   node.dataset.raw = prompt;
 }
+function modelStatusInfo(model) {
+  if (model.enabled === false) return { text: "已停用", cls: "disabled" };
+  if (model.configured === false) return { text: "未配置", cls: "warn" };
+  if (model.quota?.kind === "exhausted") return { text: "额度耗尽", cls: "warn" };
+  return { text: "可用", cls: "" };
+}
+function formatQuota(quota) {
+  if (!quota || typeof quota !== "object") return "";
+  if (quota.kind === "usd") {
+    const remaining = Number.isFinite(Number(quota.remaining)) ? `$${Number(quota.remaining).toFixed(2)}` : "";
+    const limit = Number.isFinite(Number(quota.limit)) ? `$${Number(quota.limit).toFixed(2)}` : "";
+    return remaining && limit ? `余额 ${remaining}/${limit}` : "";
+  }
+  if (quota.kind === "usage") return Number.isFinite(Number(quota.used)) ? `已用 $${Number(quota.used).toFixed(2)}` : "";
+  if (quota.kind === "free") return Number.isFinite(Number(quota.used)) ? `免费层 · 已用 $${Number(quota.used).toFixed(2)}` : "免费层";
+  if (quota.kind === "note") return quota.note || "";
+  if (quota.kind === "disabled") return "已停用";
+  if (quota.kind === "exhausted") return "额度已耗尽";
+  return "";
+}
 function renderModels(payload) {
-  const models = Array.isArray(payload?.data) ? payload.data : [];
+  const models = (Array.isArray(payload?.data) ? payload.data : [])
+    .filter((model) => model && model.enabled !== false && model.configured !== false && model.id);
   state.models = models;
   const list = $("models-list");
   if (!models.length) {
@@ -218,8 +239,8 @@ function renderModels(payload) {
   } else {
     list.innerHTML = models.map((model, index) => {
       const rank = index + 1;
-      const disabled = model.enabled === false;
-      const badge = disabled ? "已停用" : (model.configured === false ? "未配置" : "可用");
+      const info = modelStatusInfo(model);
+      const quota = formatQuota(model.quota);
       const label = model.vendor || model.provider || "gateway";
       return `<div class="model-row"><span class="model-rank${rank <= 3 ? ` rank-${rank}` : ""}">${String(rank).padStart(2, "0")}</span><div class="model-info"><strong>${escapeHtml(model.id || "unknown")}</strong><small>${escapeHtml(label)}</small></div>${quota ? `<span class="model-quota">${escapeHtml(quota)}</span>` : ""}<span class="model-badge${info.cls ? ` ${info.cls}` : ""}">${info.text}</span></div>`;
     }).join("");
@@ -232,7 +253,7 @@ function renderModels(payload) {
   const seen = new Set();
   for (const model of models) {
     const provider = String(model.provider || "").trim();
-    if (!provider || seen.has(provider) || model.enabled === false || model.configured === false) continue;
+    if (!provider || !model.id || seen.has(provider) || model.enabled === false || model.configured === false) continue;
     seen.add(provider);
     providers.push({ provider, label: model.vendor || provider, model: model.id || "" });
   }

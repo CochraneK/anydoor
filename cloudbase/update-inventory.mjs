@@ -23,15 +23,13 @@ const statusUpdates = {
   reka: 'verified',
   zhipu: 'verified',
   alibaba: 'verified',
-  'kilo-b': 'verified_flaky',
   longcat: 'verified_auth_quota_exhausted',
-  'openrouter-b': 'verified',
 };
 
 const tiers = {
   kimi: 40, qwen: 26, freellm: 50, agnes: 35, github: 90, kilo: 30, llm7: 45,
   nvidia: 28, ollama: 42, opencode: 91, openrouter: 38, pollinations: 92,
-  reka: 44, zhipu: 32, alibaba: 26, 'kilo-b': 31, longcat: 60, 'openrouter-b': 39,
+  reka: 44, zhipu: 32, alibaba: 26, longcat: 60,
 };
 
 const quotaOverrides = {
@@ -45,7 +43,6 @@ const quotaOverrides = {
   kimi: 'quota_note=按量计费',
   agnes: 'quota_note=免费试用',
   kilo: 'quota_note=免费路由',
-  'kilo-b': 'quota_note=免费路由',
   llm7: 'quota_note=免费额度',
   nvidia: 'quota_note=免费额度',
   ollama: 'quota_note=按量计费',
@@ -118,7 +115,16 @@ const newProviders = [
 
 const blocks = [];
 for (const p of newProviders) {
-  if (text.includes('[provider.' + p.name + ']')) continue;
+  if (text.includes('[provider.' + p.name + ']')) {
+    // Ensure quota_note exists on previously-created entries.
+    const re = new RegExp('(\\[provider\\.' + p.name + '\\][\\s\\S]*?)(?=\\n\\[|\\s*$)');
+    const m = text.match(re);
+    if (m && !/^quota_note=/m.test(m[1])) {
+      const patched = m[1].replace(/\r?\n$/, '') + '\nquota_note=按量计费（免费额度见百炼控制台）\n';
+      text = text.replace(m[1], patched);
+    }
+    continue;
+  }
   blocks.push([
     `[provider.${p.name}]`,
     `vendor=Alibaba Bailian (${p.note})`,
