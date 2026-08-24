@@ -5,3 +5,10 @@ api.txt
 *.log
 gateway/data/
 node_modules/
+
+# Deploy config contains GATEWAY_KEY; keep the example template committed instead.
+cloudbaserc.json
+cloudbase/secrets.env
+
+# Generated: synced from gateway/ by cloudbase/sync-gateway.ps1 before deploy.
+cloudbase/anydoorApi/gateway/

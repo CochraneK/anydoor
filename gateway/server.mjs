@@ -26,7 +26,7 @@ const STATIC_ASSETS = new Map([
 const PASSWORD_SCRYPT_OPTIONS = { N: 16_384, r: 8, p: 1 };
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-class AuthError extends Error {
+export class AuthError extends Error {
   constructor(message, code, status = 400) {
     super(message);
     this.name = 'AuthError';
@@ -458,6 +458,7 @@ export function loadConfig() {
     maxOutputTokens: numberEnv('MAX_OUTPUT_TOKENS', 1800),
     rateLimitPerMinute: numberEnv('RATE_LIMIT_PER_MINUTE', 30),
     dailyTokenBudget: numberEnv('DAILY_TOKEN_BUDGET', 250000),
+    upstreamTimeoutMs: numberEnv('UPSTREAM_TIMEOUT_MS', 60000),
     mockUpstream: process.env.MOCK_UPSTREAM === 'true',
     auth: {
       enabled: process.env.AUTH_ENABLED !== 'false',
@@ -576,17 +577,17 @@ function matchesSecret(supplied, expectedValue) {
   return crypto.timingSafeEqual(actual, expected);
 }
 
-function resolveIdentity(req, config, authStore) {
+export async function resolveIdentity(req, config, authStore) {
   const supplied = suppliedCredential(req);
   if (matchesSecret(supplied, config.gatewayKey)) return { kind: 'gateway' };
-  const user = authStore?.findByToken(supplied);
+  const user = await authStore?.findByToken(supplied);
   if (user) return { kind: 'user', user };
   if (!config.gatewayKey && !config.auth.requireToken) return { kind: 'anonymous' };
   return null;
 }
 
-function authenticate(req, config, authStore) {
-  return Boolean(resolveIdentity(req, config, authStore));
+async function authenticate(req, config, authStore) {
+  return Boolean(await resolveIdentity(req, config, authStore));
 }
 
 async function readJsonBody(req, maxBytes) {
@@ -785,7 +786,7 @@ async function callProvider(payload, providerConfig, config, providerName) {
   const headers = { 'content-type': 'application/json' };
   if (providerConfig.apiKey && providerConfig.auth !== 'none') headers.authorization = `Bearer ${providerConfig.apiKey}`;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 60_000);
+  const timeout = setTimeout(() => controller.abort(), Math.max(1000, Number(config.upstreamTimeoutMs) || 60_000));
   try {
     const response = await fetch(`${providerUrl.href.replace(/\/$/, '')}/chat/completions`, {
       method: 'POST',
@@ -818,7 +819,7 @@ export function createServer({ config = loadConfig(), state = createState(), aut
       minPasswordLength: normalizedConfig.auth.minPasswordLength,
     }) : null);
   state.authStore = authStore;
-  const server = http.createServer(async (req, res) => {
+  async function handleRequest(req, res) {
     const id = requestId();
     const cors = corsHeaders(req, normalizedConfig);
     if (req.method === 'OPTIONS') { res.writeHead(204, cors); res.end(); return; }
@@ -853,7 +854,7 @@ export function createServer({ config = loadConfig(), state = createState(), aut
       return;
     }
 
-    const identity = publicAuthRoute ? null : resolveIdentity(req, normalizedConfig, authStore);
+    const identity = publicAuthRoute ? null : await resolveIdentity(req, normalizedConfig, authStore);
     if (!publicAuthRoute && !identity) {
       sendJson(res, 401, safeError('gateway authentication required', 'unauthorized', id), cors);
       return;
@@ -875,7 +876,7 @@ export function createServer({ config = loadConfig(), state = createState(), aut
         return;
       }
       try {
-        const issued = authStore.register(body.email, body.password, body.name);
+        const issued = await authStore.register(body.email, body.password, body.name);
         sendJson(res, 201, authPayload(issued), cors);
       } catch (error) {
         const status = Number(error.status) || 503;
@@ -896,7 +897,7 @@ export function createServer({ config = loadConfig(), state = createState(), aut
         return;
       }
       try {
-        const issued = authStore.login(body.email, body.password);
+        const issued = await authStore.login(body.email, body.password);
         sendJson(res, 200, authPayload(issued), cors);
       } catch (error) {
         const status = Number(error.status) || 503;
@@ -931,14 +932,14 @@ export function createServer({ config = loadConfig(), state = createState(), aut
       }
       let user = identity.kind === 'user' ? identity.user : null;
       if (identity.kind === 'gateway') {
-        user = authStore.findByEmail(body.email);
+        user = await authStore.findByEmail(body.email);
         if (!user) {
           sendJson(res, 404, safeError('account not found', 'account_not_found', id), cors);
           return;
         }
       }
       try {
-        const issued = authStore.rotateToken(user);
+        const issued = await authStore.rotateToken(user);
         sendJson(res, 200, authPayload(issued), cors);
       } catch (error) {
         const status = Number(error.status) || 503;
@@ -1014,8 +1015,9 @@ export function createServer({ config = loadConfig(), state = createState(), aut
       return;
     }
     sendJson(res, 404, safeError('route not found', 'not_found', id), cors);
-  });
-  return { server, config: normalizedConfig, state, authStore };
+  }
+  const server = http.createServer(handleRequest);
+  return { server, handler: handleRequest, config: normalizedConfig, state, authStore };
 }
 
 // `import.meta.url` is a URL while `process.argv[1]` is a native path. The

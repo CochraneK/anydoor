@@ -50,6 +50,10 @@ function normalizeBase(value) {
 function defaultApiBase() {
   const queryBase = new URLSearchParams(window.location.search).get("api");
   if (queryBase) return normalizeBase(queryBase);
+  // The public demo copy lives on GitHub Pages and talks to the CloudBase function.
+  if (window.location.hostname.endsWith(".github.io")) {
+    return "https://cris-d6gkkzled0d106625.service.tcloudbase.com/anydoorApi";
+  }
   // A gateway-hosted page is always same-origin. Copies hosted elsewhere use
   // the ?api= override or the 连接设置 field; never guess a fixed port.
   return "";
