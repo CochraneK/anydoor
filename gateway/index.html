@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="API 中转站账号与访问令牌工作台">
+  <title>AnyDoor · API 访问工作台</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="./" aria-label="AnyDoor API 访问工作台">
+        <span class="brand-mark" aria-hidden="true">A</span>
+        <span class="brand-copy"><strong>ANYDOOR</strong><small>API_ACCESS</small><span class="sr-only">API ACCESS</span></span>
+      </a>
+      <div class="topbar-actions">
+        <span id="connection-state" class="connection-state" data-state="idle"><span class="state-dot" aria-hidden="true"></span><span id="connection-label">未连接</span></span>
+        <button id="logout-btn" class="icon-button" type="button" title="退出登录" aria-label="退出登录" hidden>↪</button>
+      </div>
+    </header>
+
+    <main>
+      <section id="auth-view" class="auth-view">
+        <div class="auth-intro">
+          <p class="eyebrow">ONE KEY · MANY MODELS</p>
+          <h1>注册账号，<em>立即开始调用</em></h1>
+          <p class="intro-copy">一个平台令牌，统一访问已配置的 OpenAI 兼容模型。注册完成后令牌只在当前页面明文展示一次。</p>
+          <div class="intro-points" aria-label="服务状态">
+            <span><i aria-hidden="true">✓</i> 统一 API 入口</span>
+            <span><i aria-hidden="true">✓</i> 用量与限流保护</span>
+            <span><i aria-hidden="true">✓</i> 随时复制调用示例</span>
+          </div>
+        </div>
+
+        <div class="auth-card panel">
+          <div class="auth-tabs" role="tablist" aria-label="账号操作">
+            <button class="auth-tab active" id="login-tab" type="button" role="tab" aria-selected="true" aria-controls="auth-form" data-mode="login">登录</button>
+            <button class="auth-tab" id="register-tab" type="button" role="tab" aria-selected="false" aria-controls="auth-form" data-mode="register">注册</button>
+          </div>
+          <form id="auth-form" novalidate>
+            <div id="name-field" class="field" hidden>
+              <label for="name-input">称呼 <span class="optional">可选</span></label>
+              <input id="name-input" name="name" type="text" autocomplete="name" maxlength="80" placeholder="团队或个人名称">
+            </div>
+            <div class="field">
+              <label for="email-input">邮箱</label>
+              <input id="email-input" name="email" type="email" autocomplete="email" required maxlength="254" placeholder="you@example.com">
+            </div>
+            <div class="field">
+              <div class="field-label-row"><label for="password-input">密码</label><span class="password-hint">至少 8 位</span></div>
+              <div class="password-input"><input id="password-input" name="password" type="password" autocomplete="current-password" required minlength="8" maxlength="128" placeholder="输入密码"><button id="password-toggle" class="field-icon" type="button" title="显示密码" aria-label="显示密码">◉</button></div>
+            </div>
+            <label class="check-line"><input id="remember-input" type="checkbox"><span>在此设备记住令牌</span></label>
+            <button id="auth-submit" class="primary-button" type="submit"><span id="auth-submit-label">登录</span><span class="button-arrow" aria-hidden="true">→</span></button>
+            <p id="auth-message" class="form-message" role="status" aria-live="polite"></p>
+          </form>
+          <p class="privacy-note">令牌仅用于 API 鉴权。请勿将它提交到代码仓库、截图或公开页面。</p>
+        </div>
+      </section>
+
+      <section id="workspace-view" class="workspace-view" hidden>
+        <div class="workspace-heading">
+          <div>
+            <p class="eyebrow">DEVELOPER CONSOLE</p>
+            <h1>你好，<span id="user-name">开发者</span></h1>
+            <p id="user-email" class="muted">—</p>
+          </div>
+          <div class="workspace-actions">
+            <button id="refresh-all-btn" class="secondary-button" type="button"><span aria-hidden="true">↻</span> 刷新状态</button>
+          </div>
+        </div>
+
+        <div id="new-token-banner" class="token-banner" hidden>
+          <div class="token-banner-heading"><span class="success-icon" aria-hidden="true">✓</span><div><strong>账号已创建，令牌已生成</strong><span>这是令牌唯一一次自动明文展示，请立即复制并妥善保存。</span></div></div>
+          <div class="token-reveal-row"><code id="new-token-value"></code><button id="copy-new-token-btn" class="copy-button" type="button"><span aria-hidden="true">▣</span> 复制令牌</button><button id="dismiss-token-btn" class="icon-button subtle" type="button" title="隐藏令牌" aria-label="隐藏令牌">×</button></div>
+          <p id="new-token-message" class="inline-message" role="status" aria-live="polite"></p>
+        </div>
+
+        <div class="dashboard-grid">
+          <section class="panel token-panel">
+            <div class="panel-heading"><div><p class="eyebrow">ACCESS TOKEN</p><h2>你的令牌</h2></div><span class="panel-status"><i aria-hidden="true"></i> 可用</span></div>
+            <p class="panel-copy">将令牌放在请求的 <code>Authorization</code> header 中。令牌不会显示在 URL 参数里。</p>
+            <div class="secret-row"><code id="token-value" class="secret-value">••••••••••••••••</code><button id="reveal-token-btn" class="icon-button subtle" type="button" title="显示令牌" aria-label="显示令牌">◉</button><button id="copy-token-btn" class="icon-button subtle" type="button" title="复制令牌" aria-label="复制令牌">▣</button></div>
+            <p id="token-message" class="inline-message" role="status" aria-live="polite"></p>
+            <div class="token-meta"><span>鉴权方式</span><strong>Bearer Token</strong><span>保存位置</span><strong id="token-storage">当前会话</strong></div>
+          </section>
+
+          <section class="panel endpoint-panel">
+            <div class="panel-heading"><div><p class="eyebrow">GATEWAY</p><h2>连接设置</h2></div><span id="endpoint-status" class="small-status">待检查</span></div>
+            <label class="field" for="api-base-input"><span>API 基地址</span><input id="api-base-input" type="url" spellcheck="false" placeholder="http://127.0.0.1:8797"></label>
+            <div class="endpoint-actions"><button id="check-health-btn" class="secondary-button" type="button"><span aria-hidden="true">⌁</span> 检查连接</button><span id="health-detail" class="muted">保存后用于下方示例</span></div>
+          </section>
+        </div>
+
+        <section class="panel quickstart-panel">
+          <div class="panel-heading quickstart-heading"><div><p class="eyebrow">QUICKSTART</p><h2>复制一段即可调用</h2></div><button id="copy-snippet-btn" class="secondary-button" type="button"><span aria-hidden="true">▣</span> 复制示例</button></div>
+          <div class="snippet-tabs" role="tablist" aria-label="调用示例语言">
+            <button class="snippet-tab active" type="button" role="tab" aria-selected="true" data-snippet="curl">cURL</button>
+            <button class="snippet-tab" type="button" role="tab" aria-selected="false" data-snippet="javascript">JavaScript</button>
+            <button class="snippet-tab" type="button" role="tab" aria-selected="false" data-snippet="python">Python</button>
+          </div>
+          <pre class="code-block"><code id="snippet-code"></code></pre>
+          <p class="code-note">示例会使用当前令牌与网关地址。生产环境请通过服务端密钥管理注入令牌。</p>
+        </section>
+
+        <div class="dashboard-grid lower-grid">
+          <section class="panel models-panel">
+            <div class="panel-heading"><div><p class="eyebrow">MODELS</p><h2>可用模型</h2></div><button id="refresh-models-btn" class="icon-button subtle" type="button" title="刷新模型列表" aria-label="刷新模型列表">↻</button></div>
+            <div id="models-list" class="models-list"><div class="loading-state">正在读取模型…</div></div>
+            <p id="models-usage" class="usage-line"></p>
+          </section>
+
+          <section class="panel test-panel">
+            <div class="panel-heading"><div><p class="eyebrow">PLAYGROUND</p><h2>发送测试请求</h2></div><span class="small-status">不会保存内容</span></div>
+            <label class="field" for="provider-input"><span>提供方</span><select id="provider-input"><option value="">自动选择</option></select></label>
+            <label class="field" for="prompt-input"><span>消息</span><textarea id="prompt-input" rows="4" maxlength="4000" placeholder="例如：用一句话介绍这个 API 网关"></textarea></label>
+            <div class="test-actions"><button id="send-test-btn" class="primary-button" type="button"><span aria-hidden="true">↗</span> 发送请求</button><span id="test-status" class="muted" role="status" aria-live="polite"></span></div>
+            <div id="test-result-wrap" class="result-wrap" hidden><div class="result-heading"><span>响应</span><button id="copy-result-btn" class="icon-button subtle" type="button" title="复制响应" aria-label="复制响应">▣</button></div><pre id="test-result" class="result-block"></pre></div>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <footer><span>ANYDOOR · API 访问工作台</span><span>请遵守上游模型与当地法规</span></footer>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <script src="app.js"></script>
+</body>
+</html>

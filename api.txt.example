@@ -1,0 +1,230 @@
+# AnyDoor provider registry TEMPLATE - copy to api.txt and fill real keys, or generate with the import scripts.
+# Generated: 2026-08-24T04:24:10.518Z
+# WARNING: this file contains plaintext credentials. Keep it outside public/static directories, restrict permissions, and rotate keys that have been exposed.
+# The gateway reads this file only on the server. Never return api_key fields to clients.
+[provider.kimi]
+vendor=Moonshot Kimi
+base_url=https://api.moonshot.cn/v1
+protocol=chat
+model=moonshot-v1-8k
+config_url=https://platform.moonshot.cn/console/api-keys
+docs_url=https://platform.moonshot.cn/docs/intro
+source=api.txt (existing)
+status=verified
+enabled=true
+api_key=replace-me
+[provider.qwen]
+vendor=Alibaba Cloud Model Studio / DashScope
+base_url=https://dashscope.aliyuncs.com/compatible-mode/v1
+protocol=chat
+model=qwen-plus
+config_url=https://bailian.console.aliyun.com/?tab=model#/api-key
+docs_url=https://help.aliyun.com/zh/model-studio/developer-reference/compatibility-of-openai-with-dashscope
+source=api.txt (existing)
+status=verified
+enabled=true
+api_key=replace-me
+[provider.freellm]
+vendor=FreeLLMAPI (local aggregator)
+protocol=chat
+model=auto
+config_url=http://127.0.0.1:18080/
+docs_url=http://127.0.0.1:18080/v1/models
+source=FreeLLMAPI unified key + local DB catalog
+status=verified_local
+enabled=true
+base_url=http://127.0.0.1:18080/v1
+api_key=replace-me
+catalog_count=145
+catalog_vendors=agnes,cerebras,cloudflare,cohere,google,groq,huggingface,kilo,llm7,mistral,nvidia,ollama,opencode,openrouter,ovh,reka,zhipu
+[provider.agnes]
+vendor=Agnes AI
+base_url=https://apihub.agnes-ai.com/v1
+protocol=chat
+model=agnes-2.0-flash
+config_url=https://apihub.agnes-ai.com/
+docs_url=https://apihub.agnes-ai.com/
+source=FreeLLMAPI encrypted DB (authorized export)
+status=verified
+enabled=true
+api_key=replace-me
+auth=bearer
+[provider.github]
+vendor=GitHub Models
+base_url=https://models.github.ai/inference
+protocol=chat
+model=openai/gpt-4.1
+config_url=https://github.com/settings/tokens
+docs_url=https://docs.github.com/en/github-models
+source=FreeLLMAPI encrypted DB (authorized export)
+status=retired_410
+enabled=false
+api_key=replace-me
+auth=bearer
+[provider.kilo]
+vendor=Kilo Gateway
+base_url=https://api.kilo.ai/api/gateway/v1
+protocol=chat
+model=kilo-auto/free
+config_url=https://app.kilo.ai/
+docs_url=https://docs.kilo.ai/
+source=FreeLLMAPI encrypted DB (authorized export)
+status=verified_no_key
+enabled=true
+auth=none
+[provider.llm7]
+vendor=LLM7
+base_url=https://api.llm7.io/v1
+protocol=chat
+model=codestral-latest
+config_url=https://llm7.io/
+docs_url=https://llm7.io/
+source=FreeLLMAPI encrypted DB (authorized export)
+status=verified
+enabled=true
+api_key=replace-me
+auth=bearer
+[provider.nvidia]
+vendor=NVIDIA NIM
+base_url=https://integrate.api.nvidia.com/v1
+protocol=chat
+model=openai/gpt-oss-20b
+config_url=https://build.nvidia.com/
+docs_url=https://docs.api.nvidia.com/
+source=FreeLLMAPI encrypted DB (authorized export)
+status=verified
+enabled=true
+api_key=replace-me
+auth=bearer
+[provider.ollama]
+vendor=Ollama Cloud
+base_url=https://ollama.com/v1
+protocol=chat
+model=gemma4:31b
+config_url=https://ollama.com/settings/keys
+docs_url=https://docs.ollama.com/api
+source=FreeLLMAPI encrypted DB (authorized export)
+status=verified
+enabled=true
+api_key=replace-me
+auth=bearer
+[provider.opencode]
+vendor=OpenCode Zen
+base_url=https://opencode.ai/zen/v1
+protocol=chat
+model=big-pickle
+config_url=https://opencode.ai/
+docs_url=https://opencode.ai/docs/
+source=FreeLLMAPI encrypted DB (authorized export)
+status=verified
+enabled=true
+api_key=replace-me
+auth=bearer
+[provider.openrouter]
+vendor=OpenRouter
+base_url=https://openrouter.ai/api/v1
+protocol=chat
+model=nvidia/nemotron-3.5-lightning:free
+config_url=https://openrouter.ai/keys
+docs_url=https://openrouter.ai/docs/api-reference/overview
+source=FreeLLMAPI encrypted DB (authorized export)
+status=verified
+enabled=true
+api_key=replace-me
+auth=bearer
+[provider.pollinations]
+vendor=Pollinations
+base_url=https://text.pollinations.ai/openai/v1
+protocol=chat
+model=openai
+config_url=https://pollinations.ai/
+docs_url=https://text.pollinations.ai/
+source=FreeLLMAPI encrypted DB (authorized export)
+status=payment_required_402
+enabled=false
+auth=none
+[provider.reka]
+vendor=Reka
+base_url=https://api.reka.ai/v1
+protocol=chat
+model=reka-flash
+config_url=https://platform.reka.ai/
+docs_url=https://docs.reka.ai/
+source=FreeLLMAPI encrypted DB (authorized export)
+status=verified
+enabled=true
+api_key=replace-me
+auth=bearer
+[provider.zhipu]
+vendor=Zhipu / BigModel
+base_url=https://open.bigmodel.cn/api/paas/v4
+protocol=chat
+model=glm-4.5-flash
+config_url=https://open.bigmodel.cn/usercenter/apikeys
+docs_url=https://open.bigmodel.cn/dev/api
+source=FreeLLMAPI encrypted DB (authorized export)
+status=verified
+enabled=true
+api_key=replace-me
+auth=bearer
+[provider.alibaba]
+vendor=Alibaba Cloud Model Studio
+base_url=https://dashscope.aliyuncs.com/compatible-mode/v1
+protocol=chat
+model=qwen-plus
+config_url=https://bailian.console.aliyun.com/?tab=model#/api-key
+docs_url=https://help.aliyun.com/zh/model-studio/
+source=OmniRoute encrypted DB (authorized export)
+status=verified_omniroute
+enabled=true
+api_key=replace-me
+auth=bearer
+
+[provider.kilo-b]
+vendor=Kilo Gateway
+base_url=https://api.kilo.ai/api/gateway/v1
+protocol=chat
+model=kilo-auto/free
+config_url=https://app.kilo.ai/
+docs_url=https://docs.kilo.ai/
+source=OmniRoute encrypted DB (authorized export)
+status=verified_omniroute
+enabled=true
+api_key=replace-me
+auth=bearer
+
+[provider.longcat]
+vendor=LongCat (Meituan)
+base_url=https://api.longcat.chat/openai/v1
+protocol=chat
+model=LongCat-2.0
+config_url=https://longcat.chat/
+docs_url=https://longcat.chat/platform/docs
+source=OmniRoute encrypted DB (authorized export)
+status=verified_auth_quota_exhausted
+enabled=true
+api_key=replace-me
+auth=bearer
+
+[provider.openrouter-b]
+vendor=OpenRouter
+base_url=https://openrouter.ai/api/v1
+protocol=chat
+model=nvidia/nemotron-3.5-lightning:free
+config_url=https://openrouter.ai/keys
+docs_url=https://openrouter.ai/docs/api-reference/overview
+source=OmniRoute encrypted DB (authorized export)
+status=verified_omniroute
+enabled=true
+api_key=replace-me
+auth=bearer
+
+[gateway]
+api_config_file=./api.txt
+default_provider=kimi
+protocol=OpenAI-compatible chat completions
+last_checked=2026-08-24T04:24:10.518Z
+[security]
+plaintext=true
+rotate_before_public_launch=true
+codex_login_accounts=not exported; do not use passwords, cookies, or session tokens as API credentials
