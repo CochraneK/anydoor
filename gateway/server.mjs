@@ -454,7 +454,7 @@ export function loadConfig() {
     gatewayKey: process.env.GATEWAY_KEY || '',
     allowedOrigins: (process.env.ALLOWED_ORIGINS || '*').split(',').map((value) => value.trim()).filter(Boolean),
     trustProxy: process.env.TRUST_PROXY === 'true',
-    maxBodyBytes: numberEnv('MAX_BODY_BYTES', 512 * 1024),
+    maxBodyBytes: numberEnv('MAX_BODY_BYTES', 4 * 1024 * 1024),
     maxOutputTokens: numberEnv('MAX_OUTPUT_TOKENS', 1800),
     rateLimitPerMinute: numberEnv('RATE_LIMIT_PER_MINUTE', 30),
     dailyTokenBudget: numberEnv('DAILY_TOKEN_BUDGET', 250000),
