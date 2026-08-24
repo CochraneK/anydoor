@@ -97,14 +97,16 @@
         </div>
 
         <section class="panel quickstart-panel">
-          <div class="panel-heading quickstart-heading"><div><p class="eyebrow">QUICKSTART</p><h2>复制一段即可调用</h2></div><button id="copy-snippet-btn" class="secondary-button" type="button"><span aria-hidden="true">▣</span> 复制示例</button></div>
-          <div class="snippet-tabs" role="tablist" aria-label="调用示例语言">
-            <button class="snippet-tab active" type="button" role="tab" aria-selected="true" data-snippet="curl">cURL</button>
+          <div class="panel-heading quickstart-heading"><div><p class="eyebrow">QUICKSTART</p><h2>复制一段即可调用，AI 也能自动配置</h2></div><button id="copy-snippet-btn" class="secondary-button" type="button"><span aria-hidden="true">▣</span> 一键复制</button></div>
+          <div class="snippet-tabs" role="tablist" aria-label="调用方式">
+            <button class="snippet-tab active" type="button" role="tab" aria-selected="true" data-snippet="codex">Codex 一键配置</button>
+            <button class="snippet-tab" type="button" role="tab" aria-selected="false" data-snippet="workbuddy">WorkBuddy 一键配置</button>
+            <button class="snippet-tab" type="button" role="tab" aria-selected="false" data-snippet="curl">cURL</button>
             <button class="snippet-tab" type="button" role="tab" aria-selected="false" data-snippet="javascript">JavaScript</button>
             <button class="snippet-tab" type="button" role="tab" aria-selected="false" data-snippet="python">Python</button>
           </div>
           <pre class="code-block"><code id="snippet-code"></code></pre>
-          <p class="code-note">示例会使用当前令牌与网关地址。生产环境请通过服务端密钥管理注入令牌。</p>
+          <p class="code-note">「Codex / WorkBuddy 一键配置」是整段提示词：复制后直接发给对应的 AI，它会自动完成接入（含地址、令牌与模型）。提示词里包含你的令牌，请勿发给不信任的对象。</p>
         </section>
 
         <div class="dashboard-grid lower-grid">
