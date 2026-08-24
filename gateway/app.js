@@ -221,7 +221,7 @@ function renderModels(payload) {
       const disabled = model.enabled === false;
       const badge = disabled ? "已停用" : (model.configured === false ? "未配置" : "可用");
       const label = model.vendor || model.provider || "gateway";
-      return `<div class="model-row"><span class="model-rank${rank <= 3 ? ` rank-${rank}` : ""}">${String(rank).padStart(2, "0")}</span><div class="model-info"><strong>${escapeHtml(model.id || "unknown")}</strong><small>${escapeHtml(label)}</small></div><span class="model-badge${disabled ? " disabled" : ""}">${badge}</span></div>`;
+      return `<div class="model-row"><span class="model-rank${rank <= 3 ? ` rank-${rank}` : ""}">${String(rank).padStart(2, "0")}</span><div class="model-info"><strong>${escapeHtml(model.id || "unknown")}</strong><small>${escapeHtml(label)}</small></div>${quota ? `<span class="model-quota">${escapeHtml(quota)}</span>` : ""}<span class="model-badge${info.cls ? ` ${info.cls}` : ""}">${info.text}</span></div>`;
     }).join("");
   }
   const usage = payload?.usage;

@@ -168,6 +168,8 @@ textarea { resize: vertical; line-height: 1.6; }
 .model-row small { margin-top: 4px; color: var(--faint); font-size: 10px; }
 .model-badge { flex: 0 0 auto; border: 2px solid var(--blue); padding: 3px 8px; color: var(--blue); font-size: 10px; font-weight: 800; }
 .model-badge.disabled { border-color: var(--faint); color: var(--faint); }
+.model-badge.warn { border-color: #a06a00; color: #a06a00; }
+.model-quota { flex: 0 0 auto; max-width: 150px; overflow: hidden; color: var(--faint); font-size: 10px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
 .loading-state, .empty-state { color: var(--faint); font-size: 12px; }
 .usage-line { min-height: 18px; margin: 14px 0 0; color: var(--muted); font-size: 11px; font-weight: 600; }
 
