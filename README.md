@@ -2,6 +2,13 @@
 
 这是一个零依赖的 Node.js API 中转 MVP，把多个 OpenAI-compatible 上游统一成一个端点：一把令牌，任意通行。现在已经包含“注册账号 → 自动发放 Bearer token → 调用 OpenAI-compatible API”的最小闭环，适合先上线小规模 beta，再逐步补齐计费和后台。
 
+## 线上部署（不开电脑也能用）
+
+- **控制台（GitHub Pages 静态托管）**：<https://cochranek.github.io/anydoor/> —— 打开即注册，注册成功自动发放 `gw_` 令牌。
+- **API（腾讯云 CloudBase 云函数）**：`https://cris-d6gkkzled0d106625.service.tcloudbase.com/anydoorApi`，OpenAI 兼容（`/v1/chat/completions`、`/v1/models`），也提供 `/auth/register`、`/auth/login`、`/auth/me`。
+- 账号/密码/令牌存 CloudBase 文档数据库（密码 scrypt 加盐哈希、令牌只存哈希）；上游 API Key 只存在云函数目录的 `api.txt`（不进 Git）。
+- 部署、更新、密钥位置说明见 [cloudbase/DEPLOY.md](cloudbase/DEPLOY.md)。
+
 ## 已实现
 
 - `GET /health`：存活检查。
