@@ -1,7 +1,0 @@
-# Never commit credentials or user data.
-api.txt
-.env
-.env.*
-*.log
-gateway/data/
-node_modules/
